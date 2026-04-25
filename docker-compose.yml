@@ -1,0 +1,28 @@
+services:
+  raft-node-1:
+    build: .
+    container_name: node_1
+    environment:
+      - NODE_NAME=NODE_1
+    tty: true
+
+  raft-node-2:
+    build: .
+    container_name: node_2
+    environment:
+      - NODE_NAME=NODE_2
+    tty: true
+
+  raft-node-3:
+    build: .
+    container_name: node_3
+    environment:
+      - NODE_NAME=NODE_3
+    tty: true
+
+  raft-node-4:
+    build: .
+    container_name: node_4
+    environment:
+      - NODE_NAME=NODE_4
+    tty: true
