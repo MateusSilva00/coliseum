@@ -1,13 +1,13 @@
 from enum import Enum
 from random import uniform
-from time import time
+from time import monotonic
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
-ELECTION_TIMEOUT = (150, 300)
-HEARTBEAT_INTERVAL = 50
+ELECTION_TIMEOUT_RANGE = (5000, 30000)
+HEARTBEAT_INTERVAL = 200
 
 
 class Daemon(BaseModel):
@@ -15,40 +15,50 @@ class Daemon(BaseModel):
     objectId: str
 
 
-class AllowedStates(str, Enum):
+class NodeState(str, Enum):
     Follower = "Follower"
     Leader = "Leader"
     Candidate = "Candidate"
 
 
-class Node(BaseModel):
+class RaftNode(BaseModel):
     node_id: str = Field(default_factory=lambda: str(uuid4())[:8])
-    state: AllowedStates = Field(default=AllowedStates.Follower)
+    state: NodeState = Field(default=NodeState.Follower)
     election_timeout: float = Field(
-        default_factory=lambda: (time() * 1000) + uniform(*ELECTION_TIMEOUT)
+        default_factory=lambda: (monotonic() * 1000) + uniform(*ELECTION_TIMEOUT_RANGE)
     )
     hearbeat_timeout: float = Field(
-        default_factory=lambda: (time() * 1000) + HEARTBEAT_INTERVAL
+        default_factory=lambda: (monotonic() * 1000) + HEARTBEAT_INTERVAL
     )
-    term: int
-    daemon: Daemon
-    voted_for: Optional[str]
-    log: List[Dict[str, Any]]
-    commit_index: int
+    term: int = Field(default=0)
+    # daemon: Daemon
+    voted_for: Optional[str] = None
+    log: List[Dict[str, Any]] = Field(default_factory=list)
+    commit_index: int = Field(default=0)
     # lastApplied: int
     # nextIndex: Dict[str, int]
     # matchIndex: Dict[str, int]
 
     def __str__(self) -> str:
+        time_until_timeout = (self.election_timeout - (monotonic() * 1000)) / 1000
         return (
             f"Node(\n"
             f"  node_id={self.node_id},\n"
-            f"  state={self.state.value},\n"
-            f"  election_timeout={self.election_timeout:.2f}ms\n"
+            f"  state={self.state.value}\n"
+            f"  election_timeout={time_until_timeout:.2f}s"
             f")"
         )
 
+    @computed_field
+    def is_election_expired(self) -> bool:
+        return (monotonic() * 1000) >= self.election_timeout
+
+    def reset_election_timeout(self) -> float:
+        delay = uniform(*ELECTION_TIMEOUT_RANGE)
+        self.election_timeout = (monotonic() * 1000) + delay
+        return delay / 1000
+
 
 if __name__ == "__main__":
-    node = Node()
+    node = RaftNode()
     print(node)

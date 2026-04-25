@@ -1,34 +1,40 @@
-import random
-from uuid import uuid4
+import asyncio
+import os
+from time import monotonic, time
 
-import Pyro5.api
 from loguru import logger
 
-from src.core.models import Daemon
+from src.core.models import NodeState, RaftNode
 
 
-def init_server(daemon: Daemon) -> Pyro5.api.Proxy:
-    object_id = daemon.objectId
-    port = daemon.port
-    uri = f"PYRO:{object_id}@localhost:{port}"
-    client = Pyro5.api.Proxy(uri)
-    logger.info(f"Client initialized with URI: {uri}")
+async def init():
+    node_name = os.getenv("NODE_NAME", "unknown_node")
+    node = RaftNode()
 
-    daemon = Pyro5.api.Daemon(port=port)
-    ns = Pyro5.api.locate_ns()
-    ns.register(object_id, uri)
-    logger.info(f"Daemon registered with object ID: {object_id} on port: {port}")
+    time_until_timeout = (node.election_timeout - (monotonic() * 1000)) / 1000
 
-    daemon.requestLoop()
-    return client
+    logger.info(
+        f"[{node_name}]-[{node.node_id}] iniciado como {node.state.upper()} | Timeout: {time_until_timeout:.2f}s"
+    )
 
+    try:
+        while True:
+            now_ms = monotonic() * 1000
+            if node.is_election_expired:
+                node.state = NodeState.Candidate
+                node.term += 1
+                time_until_timeout = (node.election_timeout - now_ms) / 1000
+                logger.info(f"[{node.node_id}] timeout expirado")
+                logger.info(f"[{node.node_id}] mudou para {node.state.upper()}")
+                logger.info(
+                    f"[{node.node_id}] iniciou eleição para o termo {node.term} |"
+                )
+                break
 
-def generate_server() -> Daemon:
-    server = Daemon(port=random.randint(5000, 6000), objectId=str(uuid4())[:6])
-    return server
+            await asyncio.sleep(0.1)
+    except Exception as e:
+        logger.error(f"Erro durante a inicialização: {e}")
 
 
 if __name__ == "__main__":
-    server = generate_server()
-    logger.info(f"Generated client: {server}")
-    init_server(server)
+    asyncio.run(init())
