@@ -3,7 +3,7 @@ Implementar o algoritmo de consenso Raft para replicação de log entre 4 proces
 Inicialização dos processos:
 • Inicializem o servidor de nomes do PyRO;
 • Inicializem os 4 processos que implementam o Raft como seguidores;
-• Informem uma porta ao criar o Daemon e um objectId no registro do objeto com o Daemon. Com essas duas informações, teremos o URI "PYRO:objectId@localhost:porta" de cada objeto PyRO e poderemos deixá-los hard coded; 
+• Informem uma porta ao criar o Daemon e um objectId no registro do objeto com o Daemon. Com essas duas informações, teremos o URI "PYRO:objectId@localhost:porta" de cada objeto PyRO e poderemos deixá-los hard coded;
 • Inicializem 1 processo cliente responsável por encaminhar comandos ao líder;
 
 Eleição (valor 10):

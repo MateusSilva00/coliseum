@@ -1,7 +1,7 @@
 from enum import Enum
 from random import uniform
 from time import monotonic
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, computed_field

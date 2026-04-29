@@ -1,28 +1,91 @@
 services:
-  raft-node-1:
+  nameserver:
+    build: .
+    container_name: nameserver
+    command: uv run python -m Pyro5.nameserver --host 0.0.0.0 --port 9090
+    ports:
+      - "9090:9090"
+    networks:
+      - raft-net
+    healthcheck:
+      test:
+        - "CMD"
+        - "uv"
+        - "run"
+        - "python"
+        - "-c"
+        - "import Pyro5.api; Pyro5.api.locate_ns(host='nameserver', port=9090);
+          print('ok')"
+      interval: 3s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+
+  # ---------------------------------------------------------------------------
+  # Nós Raft (4 seguidores na inicialização)
+  # Cada nó recebe NODE_NAME via env para saber qual URI/porta usar.
+  # depends_on + healthcheck garante que o nameserver esteja pronto primeiro.
+  # ---------------------------------------------------------------------------
+  node_1:
     build: .
     container_name: node_1
+    hostname: node_1
     environment:
-      - NODE_NAME=NODE_1
-    tty: true
+      - NODE_NAME=node_1
+      - PYRO_SERIALIZER=serpent
+    ports:
+      - "9001:9001"
+    depends_on:
+      nameserver:
+        condition: service_healthy
+    networks:
+      - raft-net
 
-  raft-node-2:
+  node_2:
     build: .
     container_name: node_2
+    hostname: node_2
     environment:
-      - NODE_NAME=NODE_2
-    tty: true
+      - NODE_NAME=node_2
+      - PYRO_SERIALIZER=serpent
+    ports:
+      - "9002:9002"
+    depends_on:
+      nameserver:
+        condition: service_healthy
+    networks:
+      - raft-net
 
-  raft-node-3:
+  node_3:
     build: .
     container_name: node_3
+    hostname: node_3
     environment:
-      - NODE_NAME=NODE_3
-    tty: true
+      - NODE_NAME=node_3
+      - PYRO_SERIALIZER=serpent
+    ports:
+      - "9003:9003"
+    depends_on:
+      nameserver:
+        condition: service_healthy
+    networks:
+      - raft-net
 
-  raft-node-4:
+  node_4:
     build: .
     container_name: node_4
+    hostname: node_4
     environment:
-      - NODE_NAME=NODE_4
-    tty: true
+      - NODE_NAME=node_4
+      - PYRO_SERIALIZER=serpent
+    ports:
+      - "9004:9004"
+    depends_on:
+      nameserver:
+        condition: service_healthy
+    networks:
+      - raft-net
+
+networks:
+  raft-net:
+    driver: bridge
