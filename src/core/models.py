@@ -58,10 +58,10 @@ class RaftNode(BaseModel):
         self.term += 1
         self.voted_for = self.node_name
         self.votes_received = 1  # auto-voto
-        delay = self.reset_election_timeout()
+        new_timeout = self.reset_election_timeout()
         logger.info(
             f"[{self.node_name}] → CANDIDATE | termo={self.term} | "
-            f"votou em si mesmo | novo timeout={delay:.2f}s"
+            f"Votou em si mesmo | novo timeout={new_timeout:.2f}s"
         )
 
     def become_follower(self, new_term: int) -> None:
@@ -97,20 +97,21 @@ class RaftNode(BaseModel):
         Retorna (term_atual, vote_granted).
         """
         if candidate_term < self.term:
-            logger.info(
+            logger.warning(
                 f"[{self.node_name}] REJEITOU voto para {candidate_id} | "
                 f"termo do candidato ({candidate_term}) < meu termo ({self.term})"
             )
             return (self.term, False)
 
         if self.voted_for is not None and self.voted_for != candidate_id:
-            logger.info(
+            logger.warning(
                 f"[{self.node_name}] REJEITOU voto para {candidate_id} | "
                 f"já votou em {self.voted_for} no termo {self.term}"
             )
             return (self.term, False)
 
         # 4. Concede voto
+        self.term = candidate_term
         self.voted_for = candidate_id
         self.reset_election_timeout()
         logger.success(

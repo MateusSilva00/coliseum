@@ -2,11 +2,9 @@ import os
 import threading
 import time
 
-from loguru import logger
 import Pyro5.api
 import Pyro5.errors
 
-from src.core.models import RaftNode, NodeState
 from src.core.config import (
     LEADER_NS_NAME,
     NAMESERVER_HOST,
@@ -15,6 +13,8 @@ from src.core.config import (
     NODE_PORTS,
     NODE_URIS,
 )
+from src.core.logging import logger
+from src.core.models import NodeState, RaftNode
 
 TOTAL_NODES = len(NODE_URIS)
 MAJORITY = (TOTAL_NODES // 2) + 1  # 3 de 4
@@ -129,6 +129,7 @@ def _register_leader(node_name: str) -> None:
     except Exception as e:
         logger.error(f"[{node_name}] falha ao registrar líder no nameserver: {e}")
 
+
 def _tick_loop(proxy: RaftNodeProxy, node_name: str) -> None:
     """
     Verifica periodicamente se o election timeout expirou.
@@ -162,7 +163,9 @@ def main():
     logger.success(f"[{node_name}] registrado com URI: {uri}")
     logger.info(f"[{node_name}] estado inicial:\n{node}")
 
-    tick_thread = threading.Thread(target=_tick_loop, args=(proxy, node_name), daemon=True)
+    tick_thread = threading.Thread(
+        target=_tick_loop, args=(proxy, node_name), daemon=True
+    )
     tick_thread.start()
 
     logger.info(f"[{node_name}] aguardando requisições...")
