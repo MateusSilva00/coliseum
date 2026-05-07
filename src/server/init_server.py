@@ -28,6 +28,8 @@ class RaftNodeProxy:
         self.node = node
         self.lock = threading.Lock()
 
+    # ── RPCs expostos ───────────────────────────────────────────────────
+
     def request_vote(
         self,
         candidate_id: str,
@@ -40,6 +42,22 @@ class RaftNodeProxy:
         with self.lock:
             term, granted = self.node.grant_vote(candidate_id, candidate_term)
             return {"term": term, "vote_granted": granted}
+
+    def append_entries(
+        self,
+        leader_id: str,
+        leader_term: int,
+        entries: list,
+    ) -> dict:
+        """
+        RPC AppendEntries do Raft (heartbeat quando entries=[]).
+        Retorna {"term": int, "success": bool}.
+        """
+        with self.lock:
+            term, success = self.node.handle_append_entries(
+                leader_id, leader_term, entries
+            )
+            return {"term": term, "success": success}
 
     def ping(self, from_node: str) -> str:
         logger.info(f"Recebido ping de {from_node}")
@@ -60,7 +78,6 @@ def _start_election(proxy: RaftNodeProxy, node_name: str) -> None:
         f"[{node_name}] solicitando votos dos peers para o termo {current_term}..."
     )
 
-    # Solicita votos de todos os peers em paralelo
     votes_granted = 1  # auto-voto
     for peer_name, peer_uri in NODE_URIS.items():
         if peer_name == node_name:
@@ -68,13 +85,12 @@ def _start_election(proxy: RaftNodeProxy, node_name: str) -> None:
 
         try:
             with Pyro5.api.Proxy(peer_uri) as peer:
-                peer._pyroTimeout = 3  # timeout de 3s para cada RPC
+                peer._pyroTimeout = 3
                 response = peer.request_vote(node_name, current_term)
                 peer_term = response["term"]
                 vote_granted = response["vote_granted"]
 
                 with proxy.lock:
-                    # Se o peer tem um termo maior, step-down
                     if peer_term > proxy.node.term:
                         proxy.node.become_follower(peer_term)
                         logger.warning(
@@ -129,22 +145,77 @@ def _register_leader(node_name: str) -> None:
     except Exception as e:
         logger.error(f"[{node_name}] falha ao registrar líder no nameserver: {e}")
 
+
+# ── Heartbeat do líder ─────────────────────────────────────────────────
+
+
+def _send_heartbeats(proxy: RaftNodeProxy, node_name: str) -> None:
+    """Envia AppendEntries vazio (heartbeat) para todos os followers."""
+
+    with proxy.lock:
+        current_term = proxy.node.term
+        proxy.node.reset_heartbeat_timeout()
+
+    for peer_name, peer_uri in NODE_URIS.items():
+        if peer_name == node_name:
+            continue
+
+        try:
+            with Pyro5.api.Proxy(peer_uri) as peer:
+                peer._pyroTimeout = 2
+                response = peer.append_entries(node_name, current_term, [])
+                peer_term = response["term"]
+
+                # Se algum follower tem termo maior → step-down
+                with proxy.lock:
+                    if peer_term > proxy.node.term:
+                        proxy.node.become_follower(peer_term)
+                        logger.warning(
+                            f"[{node_name}] follower {peer_name} tem termo maior "
+                            f"({peer_term}), fazendo step-down"
+                        )
+                        return
+
+        except Pyro5.errors.CommunicationError:
+            logger.warning(
+                f"[{node_name}] heartbeat falhou para {peer_name} (sem conexão)"
+            )
+        except Exception as e:
+            logger.error(f"[{node_name}] erro no heartbeat para {peer_name}: {e}")
+
+    logger.debug(f"[{node_name}] ♥ heartbeats enviados | termo={current_term}")
+
+
+# ── Tick loop ──────────────────────────────────────────────────────────
+
+
 def _tick_loop(proxy: RaftNodeProxy, node_name: str) -> None:
     """
-    Verifica periodicamente se o election timeout expirou.
+    Loop principal do Raft (roda em thread separada).
+    - Follower/Candidate: verifica election timeout
+    - Leader: envia heartbeats periodicamente
     """
     time.sleep(5)
     logger.info(f"[{node_name}] tick loop iniciado")
 
     while True:
-        time.sleep(0.2)
+        time.sleep(0.1)
 
         with proxy.lock:
             state = proxy.node.state
-            is_expired = proxy.node.is_election_expired
+            election_expired = proxy.node.is_election_expired
+            heartbeat_due = proxy.node.is_heartbeat_due
 
-        if state in (NodeState.Follower, NodeState.Candidate) and is_expired:
+        # Follower/Candidate → eleição se timeout expirou
+        if state in (NodeState.Follower, NodeState.Candidate) and election_expired:
             _start_election(proxy, node_name)
+
+        # Leader → heartbeat se intervalo expirou
+        elif state == NodeState.Leader and heartbeat_due:
+            _send_heartbeats(proxy, node_name)
+
+
+# ── Entrypoint ─────────────────────────────────────────────────────────
 
 
 def main():
@@ -162,7 +233,9 @@ def main():
     logger.success(f"[{node_name}] registrado com URI: {uri}")
     logger.info(f"[{node_name}] estado inicial:\n{node}")
 
-    tick_thread = threading.Thread(target=_tick_loop, args=(proxy, node_name), daemon=True)
+    tick_thread = threading.Thread(
+        target=_tick_loop, args=(proxy, node_name), daemon=True
+    )
     tick_thread.start()
 
     logger.info(f"[{node_name}] aguardando requisições...")
