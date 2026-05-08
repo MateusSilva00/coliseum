@@ -45,10 +45,18 @@ class RaftNode(BaseModel):
     def is_election_expired(self) -> bool:
         return (monotonic() * 1000) >= self.election_timeout
 
+    @computed_field
+    @property
+    def is_heartbeat_expired(self) -> bool:
+        return (monotonic() * 1000) >= self.hearbeat_timeout
+
     def reset_election_timeout(self) -> float:
         delay = uniform(*ELECTION_TIMEOUT_RANGE)
         self.election_timeout = (monotonic() * 1000) + delay
         return delay / 1000
+
+    def reset_heartbeat_timeout(self) -> None:
+        self.hearbeat_timeout = (monotonic() * 1000) + HEARTBEAT_INTERVAL
 
     # ── Transições de estado ────────────────────────────────────────────
 
@@ -103,6 +111,17 @@ class RaftNode(BaseModel):
             )
             return (self.term, False)
 
+        # Termo maior: atualiza o nosso e limpa voted_for (step-up)
+        if candidate_term > self.term:
+            logger.info(
+                f"[{self.node_name}] termo atualizado {self.term} → {candidate_term} "
+                f"via RequestVote de {candidate_id}"
+            )
+            self.term = candidate_term
+            self.voted_for = None
+            self.state = NodeState.Follower
+            self.votes_received = 0
+
         if self.voted_for is not None and self.voted_for != candidate_id:
             logger.warning(
                 f"[{self.node_name}] REJEITOU voto para {candidate_id} | "
@@ -117,6 +136,32 @@ class RaftNode(BaseModel):
         logger.success(
             f"[{self.node_name}] VOTOU em {candidate_id} | termo={self.term}"
         )
+        return (self.term, True)
+
+    # ── Lógica de AppendEntries (Heartbeat) ──────────────────────────────
+
+    def handle_append_entries(
+        self,
+        leader_id: str,
+        leader_term: int,
+    ) -> Tuple[int, bool]:
+        """
+        Processa um AppendEntries (heartbeat) recebido do líder.
+        Retorna (term_atual, success).
+        """
+        if leader_term < self.term:
+            logger.warning(
+                f"[{self.node_name}] REJEITOU heartbeat de {leader_id} | "
+                f"termo do líder ({leader_term}) < meu termo ({self.term})"
+            )
+            return (self.term, False)
+
+        # Heartbeat válido: atualiza estado, limpa voto e reseta timeout
+        self.term = leader_term
+        self.state = NodeState.Follower
+        self.voted_for = None
+        self.votes_received = 0
+        self.reset_election_timeout()
         return (self.term, True)
 
     def __str__(self) -> str:

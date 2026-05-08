@@ -15,6 +15,7 @@ from src.core.config import (
 from src.core.logging import logger
 from src.core.models import NodeState, RaftNode
 from src.server.election import ElectionManager
+from src.server.heartbeat import HeartbeatManager
 from src.server.proxy import RaftNodeProxy
 
 
@@ -35,6 +36,7 @@ class RaftServer:
         node = RaftNode(node_name=node_name)
         self._proxy = RaftNodeProxy(node=node)
         self._election = ElectionManager(self._proxy)
+        self._heartbeat = HeartbeatManager(self._proxy)
 
     def start(self) -> None:
         """Inicializa o daemon Pyro5, inicia o tick loop e entra no request loop."""
@@ -65,6 +67,7 @@ class RaftServer:
         while True:
             time.sleep(self._TICK_INTERVAL)
             self._check_election_timeout()
+            self._check_heartbeat_timeout()
 
     def _check_election_timeout(self) -> None:
         """Dispara eleição se o timeout tiver expirado num estado elegível."""
@@ -76,6 +79,15 @@ class RaftServer:
             won = self._election.run()
             if won:
                 self._register_as_leader()
+
+    def _check_heartbeat_timeout(self) -> None:
+        """Se o nó é líder e o heartbeat expirou, envia heartbeats aos peers."""
+        with self._proxy.lock:
+            state = self._proxy.node.state
+            is_expired = self._proxy.node.is_heartbeat_expired
+
+        if state == NodeState.Leader and is_expired:
+            self._heartbeat.run()
 
     def _register_as_leader(self) -> None:
         """Registra este nó como líder ativo no nameserver Pyro5."""
