@@ -45,10 +45,18 @@ class RaftNode(BaseModel):
     def is_election_expired(self) -> bool:
         return (monotonic() * 1000) >= self.election_timeout
 
+    @computed_field
+    @property
+    def is_heartbeat_expired(self) -> bool:
+        return (monotonic() * 1000) >= self.hearbeat_timeout
+
     def reset_election_timeout(self) -> float:
         delay = uniform(*ELECTION_TIMEOUT_RANGE)
         self.election_timeout = (monotonic() * 1000) + delay
         return delay / 1000
+
+    def reset_heartbeat_timeout(self) -> None:
+        self.hearbeat_timeout = (monotonic() * 1000) + HEARTBEAT_INTERVAL
 
     # ── Transições de estado ────────────────────────────────────────────
 
@@ -60,9 +68,9 @@ class RaftNode(BaseModel):
         self.votes_received = 1  # auto-voto
         new_timeout = self.reset_election_timeout()
         logger.info(
-            f"[{self.node_name}] → CANDIDATE | termo={self.term} | "
-            f"Votou em si mesmo | novo timeout={new_timeout:.2f}s"
+            f"[{self.node_name}] → CANDIDATE | termo={self.term}"
         )
+        logger.success("VOTOU em si mesmo | termo={self.term}")
 
     def become_follower(self, new_term: int) -> None:
         """Step-down para Follower ao receber termo maior."""
@@ -73,7 +81,7 @@ class RaftNode(BaseModel):
         self.votes_received = 0
         self.reset_election_timeout()
         logger.info(
-            f"[{self.node_name}] {old_state} → FOLLOWER | termo atualizado={new_term}"
+            f"[{self.node_name}] → FOLLOWER | termo={new_term}"
         )
 
     def become_leader(self) -> None:
@@ -81,8 +89,7 @@ class RaftNode(BaseModel):
         self.state = NodeState.Leader
         self.votes_received = 0
         logger.success(
-            f"[{self.node_name}] → LEADER | termo={self.term} | "
-            f"eleito com maioria dos votos"
+            f"[{self.node_name}] → LEADER | termo={self.term}"
         )
 
     # ── Lógica de concessão de voto ─────────────────────────────────────
@@ -103,6 +110,13 @@ class RaftNode(BaseModel):
             )
             return (self.term, False)
 
+        # Termo maior: atualiza o nosso e limpa voted_for (step-up)
+        if candidate_term > self.term:
+            self.term = candidate_term
+            self.voted_for = None
+            self.state = NodeState.Follower
+            self.votes_received = 0
+
         if self.voted_for is not None and self.voted_for != candidate_id:
             logger.warning(
                 f"[{self.node_name}] REJEITOU voto para {candidate_id} | "
@@ -117,6 +131,74 @@ class RaftNode(BaseModel):
         logger.success(
             f"[{self.node_name}] VOTOU em {candidate_id} | termo={self.term}"
         )
+        return (self.term, True)
+
+    # ── Lógica de log ────────────────────────────────────────────────────
+
+    def append_log_entry(self, command: str) -> Dict[str, Any]:
+        """
+        Líder anexa um novo comando ao log.
+        Retorna a entrada criada.
+        """
+        entry = {
+            "term": self.term,
+            "index": len(self.log) + 1,
+            "command": command,
+        }
+        self.log.append(entry)
+        logger.info(
+            f"[{self.node_name}] nova entrada no log | cmd='{command}'"
+        )
+        return entry
+
+    # ── Lógica de AppendEntries (Heartbeat + Replicação) ──────────────────
+
+    def handle_append_entries(
+        self,
+        leader_id: str,
+        leader_term: int,
+        entries: Optional[List[Dict[str, Any]]] = None,
+        leader_commit: int = 0,
+    ) -> Tuple[int, bool]:
+        """
+        Processa um AppendEntries recebido do líder.
+        Suporta heartbeat vazio e replicação de log.
+        Retorna (term_atual, success).
+        """
+        if entries is None:
+            entries = []
+
+        # 1. Rejeita se o termo do líder é menor
+        if leader_term < self.term:
+            logger.warning(
+                f"[{self.node_name}] REJEITOU AppendEntries de {leader_id} | "
+                f"termo do líder ({leader_term}) < meu termo ({self.term})"
+            )
+            return (self.term, False)
+
+        # Heartbeat válido: atualiza estado
+        self.term = leader_term
+        self.state = NodeState.Follower
+        self.voted_for = None
+        self.votes_received = 0
+        self.reset_election_timeout()
+
+        # 2. Aceita as entradas do líder (substitui o log se mudou)
+        if entries and entries != self.log:
+            self.log = list(entries)
+            logger.info(
+                f"[{self.node_name}] replicando entradas do líder {leader_id}"
+            )
+
+        # 3. Atualiza commit_index
+        if leader_commit > self.commit_index:
+            old_commit = self.commit_index
+            self.commit_index = min(leader_commit, len(self.log))
+            if self.commit_index > old_commit:
+                logger.success(
+                    f"[{self.node_name}] commit_index atualizado {old_commit} → {self.commit_index}"
+                )
+
         return (self.term, True)
 
     def __str__(self) -> str:

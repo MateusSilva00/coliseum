@@ -1,7 +1,7 @@
 NAMESERVER_HOST = "nameserver"
 NAMESERVER_PORT = 9090
 
-LEADER_NS_NAME = "raft.leader"
+LEADER_NS_NAME = "Lider"
 
 
 # Formato: "PYRO:<objectId>@<hostname>:<porta>"
