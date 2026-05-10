@@ -1,3 +1,5 @@
+import threading
+
 import Pyro5.api
 import Pyro5.errors
 
@@ -45,13 +47,12 @@ class ElectionManager:
         return self._conclude(votes, current_term)
 
     def _collect_votes(self, current_term: int) -> int:
-        """Solicita votos de todos os peers e devolve a contagem total."""
+        """Solicita votos de todos os peers em paralelo."""
         votes = 1
+        votes_lock = threading.Lock()
 
-        for peer_name, peer_uri in NODE_URIS.items():
-            if peer_name == self._node_name:
-                continue
-
+        def request_from(peer_name: str, peer_uri: str) -> None:
+            nonlocal votes
             try:
                 with Pyro5.api.Proxy(peer_uri) as peer:
                     peer._pyroTimeout = 3
@@ -61,10 +62,11 @@ class ElectionManager:
                 vote_granted = response["vote_granted"]
 
                 if self._detect_higher_term(peer_name, peer_term):
-                    return votes  # eleição abortada, step-down já realizado
+                    return
 
                 if vote_granted:
-                    votes += 1
+                    with votes_lock:
+                        votes += 1
                     logger.info(
                         f"[{self._node_name}] recebeu voto de {peer_name} | "
                         f"total={votes}/{_TOTAL_NODES}"
@@ -78,6 +80,21 @@ class ElectionManager:
                 logger.error(
                     f"[{self._node_name}] erro ao solicitar voto de {peer_name}: {e}"
                 )
+
+        threads = []
+        for peer_name, peer_uri in NODE_URIS.items():
+            if peer_name == self._node_name:
+                continue
+            t = threading.Thread(
+                target=request_from,
+                args=(peer_name, peer_uri),
+                daemon=True,
+            )
+            t.start()
+            threads.append(t)
+
+        for t in threads:
+            t.join(timeout=3)
 
         return votes
 

@@ -86,6 +86,24 @@ services:
     networks:
       - raft-net
 
+  # ---------------------------------------------------------------------------
+  # Cliente REPL — envia comandos ao líder do cluster
+  # Uso: docker attach client
+  # ---------------------------------------------------------------------------
+  client:
+    build: .
+    container_name: client
+    command: uv run python -m src.client.init_client
+    environment:
+      - PYRO_SERIALIZER=serpent
+    depends_on:
+      nameserver:
+        condition: service_healthy
+    networks:
+      - raft-net
+    stdin_open: true
+    tty: true
+
 networks:
   raft-net:
     driver: bridge
