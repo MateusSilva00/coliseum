@@ -66,31 +66,24 @@ class RaftNode(BaseModel):
         self.term += 1
         self.voted_for = self.node_name
         self.votes_received = 1  # auto-voto
-        new_timeout = self.reset_election_timeout()
-        logger.info(
-            f"[{self.node_name}] → CANDIDATE | termo={self.term}"
-        )
-        logger.success("VOTOU em si mesmo | termo={self.term}")
+        self.reset_election_timeout()
+        logger.info(f"[{self.node_name}] → CANDIDATE | termo={self.term}")
+        logger.success(f"VOTOU em si mesmo | termo={self.term}")
 
     def become_follower(self, new_term: int) -> None:
         """Step-down para Follower ao receber termo maior."""
-        old_state = self.state.value
         self.state = NodeState.Follower
         self.term = new_term
         self.voted_for = None
         self.votes_received = 0
         self.reset_election_timeout()
-        logger.info(
-            f"[{self.node_name}] → FOLLOWER | termo={new_term}"
-        )
+        logger.info(f"[{self.node_name}] → FOLLOWER | termo={new_term}")
 
     def become_leader(self) -> None:
         """Transiciona para Leader após obter maioria dos votos."""
         self.state = NodeState.Leader
         self.votes_received = 0
-        logger.success(
-            f"[{self.node_name}] → LEADER | termo={self.term}"
-        )
+        logger.success(f"[{self.node_name}] → LEADER | termo={self.term}")
 
     # ── Lógica de concessão de voto ─────────────────────────────────────
 
@@ -146,9 +139,7 @@ class RaftNode(BaseModel):
             "command": command,
         }
         self.log.append(entry)
-        logger.info(
-            f"[{self.node_name}] nova entrada no log | cmd='{command}'"
-        )
+        logger.info(f"[{self.node_name}] nova entrada no log | cmd='{command}'")
         return entry
 
     # ── Lógica de AppendEntries (Heartbeat + Replicação) ──────────────────
@@ -186,9 +177,7 @@ class RaftNode(BaseModel):
         # 2. Aceita as entradas do líder (substitui o log se mudou)
         if entries and entries != self.log:
             self.log = list(entries)
-            logger.info(
-                f"[{self.node_name}] replicando entradas do líder {leader_id}"
-            )
+            logger.info(f"[{self.node_name}] replicando entradas do líder {leader_id}")
 
         # 3. Atualiza commit_index
         if leader_commit > self.commit_index:
