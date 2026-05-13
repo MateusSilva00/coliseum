@@ -98,6 +98,7 @@ class RaftClient:
         try:
             status = leader.get_cluster_status()
             print("\n  Cluster Status:")
+            print(f"    Leader:  {status['leader']}")
             print(f"    Online:  {', '.join(status['online'])}")
             print(f"    Offline: {', '.join(status['offline']) or '—'}")
             print(f"    Total:   {status['total']}\n")

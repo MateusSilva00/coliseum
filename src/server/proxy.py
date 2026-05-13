@@ -122,6 +122,7 @@ class RaftNodeProxy:
                 offline.append(peer_name)
 
         return {
+            "leader": self.node.node_name,
             "online": online,
             "offline": offline,
             "total": len(NODE_URIS),
