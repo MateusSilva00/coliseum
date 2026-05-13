@@ -1,4 +1,3 @@
-import sys
 import time
 
 import Pyro5.api
@@ -98,7 +97,7 @@ class RaftClient:
 
         try:
             status = leader.get_cluster_status()
-            print(f"\n  Cluster Status:")
+            print("\n  Cluster Status:")
             print(f"    Online:  {', '.join(status['online'])}")
             print(f"    Offline: {', '.join(status['offline']) or '—'}")
             print(f"    Total:   {status['total']}\n")
@@ -117,7 +116,6 @@ class RaftClient:
             print(f"\n  Nó: {info['node_name']} ({info['state']})")
             print(f"  Termo: {info['term']}")
             print(f"  Commit Index: {info['commit_index']}")
-            print(f"  Last Applied: {info['last_applied']}")
             print(f"  Log ({len(info['log'])} entradas):")
 
             if not info["log"]:
@@ -152,9 +150,7 @@ class RaftClient:
         max_retries = 3
         for attempt in range(1, max_retries + 1):
             try:
-                ns = Pyro5.api.locate_ns(
-                    host=NAMESERVER_HOST, port=NAMESERVER_PORT
-                )
+                ns = Pyro5.api.locate_ns(host=NAMESERVER_HOST, port=NAMESERVER_PORT)
                 uri = ns.lookup(LEADER_NS_NAME)
                 leader_uri = str(uri)
                 logger.info(f"Líder encontrado: {leader_uri}")
