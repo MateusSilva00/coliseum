@@ -86,6 +86,36 @@ services:
     networks:
       - raft-net
 
+  node_5:
+    build: .
+    container_name: node_5
+    hostname: node_5
+    environment:
+      - NODE_NAME=node_5
+      - PYRO_SERIALIZER=serpent
+    ports:
+      - "9005:9005"
+    depends_on:
+      nameserver:
+        condition: service_healthy
+    networks:
+      - raft-net
+
+  node_6:
+    build: .
+    container_name: node_6
+    hostname: node_6
+    environment:
+      - NODE_NAME=node_6
+      - PYRO_SERIALIZER=serpent
+    ports:
+      - "9006:9006"
+    depends_on:
+      nameserver:
+        condition: service_healthy
+    networks:
+      - raft-net
+
   # ---------------------------------------------------------------------------
   # Cliente REPL — envia comandos ao líder do cluster
   # Uso: docker attach client

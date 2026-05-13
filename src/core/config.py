@@ -14,6 +14,8 @@ NODE_URIS: dict[str, str] = {
     "node_2": "PYRO:raft.node2@node_2:9002",
     "node_3": "PYRO:raft.node3@node_3:9003",
     "node_4": "PYRO:raft.node4@node_4:9004",
+    "node_5": "PYRO:raft.node5@node_5:9005",
+    "node_6": "PYRO:raft.node6@node_6:9006",
 }
 
 NODE_PORTS: dict[str, int] = {
@@ -21,6 +23,8 @@ NODE_PORTS: dict[str, int] = {
     "node_2": 9002,
     "node_3": 9003,
     "node_4": 9004,
+    "node_5": 9005,
+    "node_6": 9006,
 }
 
 NODE_OBJECT_IDS: dict[str, str] = {
@@ -28,4 +32,6 @@ NODE_OBJECT_IDS: dict[str, str] = {
     "node_2": "raft.node2",
     "node_3": "raft.node3",
     "node_4": "raft.node4",
+    "node_5": "raft.node5",
+    "node_6": "raft.node6",
 }

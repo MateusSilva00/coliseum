@@ -181,6 +181,7 @@ class RaftNode(BaseModel):
             old_commit = self.commit_index
             self.commit_index = min(leader_commit, len(self.log))
             if self.commit_index > old_commit:
+                logger.info(f"[{self.node_name}] log: {self.log}")
                 logger.success(
                     f"[{self.node_name}] commit_index atualizado {old_commit} → {self.commit_index}"
                 )
