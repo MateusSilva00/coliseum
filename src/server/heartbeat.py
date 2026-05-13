@@ -41,8 +41,7 @@ class HeartbeatManager:
             commit_index = self._proxy.node.commit_index
             self._proxy.node.reset_heartbeat_timeout()
 
-        # Conta confirmações para calcular commit
-        success_count = 1  # o líder conta como 1
+        success_count = 1
         count_lock = threading.Lock()
 
         def send_and_count(peer_name: str, peer_uri: str) -> None:

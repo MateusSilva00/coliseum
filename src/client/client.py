@@ -21,15 +21,12 @@ class RaftClient:
     def start(self) -> None:
         """Inicia o REPL interativo."""
         logger.info("Cliente Raft iniciado")
-        print("\n╔══════════════════════════════════════════════╗")
-        print("║          RAFT CLIENT — REPL                 ║")
-        print("╠══════════════════════════════════════════════╣")
-        print("║  Comandos especiais:                        ║")
-        print("║    status  → estado do cluster              ║")
-        print("║    log     → log do líder                   ║")
-        print("║    exit    → encerrar                       ║")
-        print("║  Qualquer outro texto → comando replicado   ║")
-        print("╚══════════════════════════════════════════════╝\n")
+        print("\n╔══════════════════════════════════════════╗")
+        print("║          RAFT CLIENT — REPL                ║")
+        print("╠════════════════════════════════════════════╣")
+        print("║  exit    → encerrar                        ║")
+        print("║  Qualquer outro texto → comando replicado  ║")
+        print("╚════════════════════════════════════════════╝\n")
 
         while True:
             try:
@@ -45,10 +42,6 @@ class RaftClient:
                 print("Encerrando...")
                 break
 
-            if cmd.lower() == "status":
-                self._handle_status()
-            elif cmd.lower() == "log":
-                self._handle_log()
             else:
                 self._handle_command(cmd)
 
@@ -64,13 +57,13 @@ class RaftClient:
             response = leader.submit_command(command)
             if response["success"]:
                 print(
-                    f"  ✓ Comando aceito pelo líder | "
+                    f"Comando aceito pelo líder | "
                     f"index={response['index']} | termo={response['term']}"
                 )
             else:
                 error = response.get("error", "unknown")
                 if error == "not_leader":
-                    print("  ✗ Nó não é mais líder — tentando reconectar...")
+                    print("Nó não é mais líder — tentando reconectar...")
                     self._leader_uri = None
                     # Retry uma vez
                     leader = self._get_leader_proxy()
@@ -78,59 +71,15 @@ class RaftClient:
                         response = leader.submit_command(command)
                         if response["success"]:
                             print(
-                                f"  ✓ Comando aceito pelo líder | "
+                                f"Comando aceito pelo líder | "
                                 f"index={response['index']} | termo={response['term']}"
                             )
                         else:
-                            print(f"  ✗ Falha: {response.get('error', 'unknown')}")
+                            print(f"Falha: {response.get('error', 'unknown')}")
                 else:
-                    print(f"  ✗ Erro: {error}")
+                    print(f"Erro: {error}")
         except Pyro5.errors.CommunicationError:
-            print("  ✗ Líder inacessível — tentando reconectar...")
-            self._leader_uri = None
-
-    def _handle_status(self) -> None:
-        """Mostra o estado do cluster."""
-        leader = self._get_leader_proxy()
-        if leader is None:
-            return
-
-        try:
-            status = leader.get_cluster_status()
-            print("\n  Cluster Status:")
-            print(f"    Leader:  {status['leader']}")
-            print(f"    Online:  {', '.join(status['online'])}")
-            print(f"    Offline: {', '.join(status['offline']) or '—'}")
-            print(f"    Total:   {status['total']}\n")
-        except Pyro5.errors.CommunicationError:
-            print("  ✗ Líder inacessível")
-            self._leader_uri = None
-
-    def _handle_log(self) -> None:
-        """Mostra o log do líder."""
-        leader = self._get_leader_proxy()
-        if leader is None:
-            return
-
-        try:
-            info = leader.get_log()
-            print(f"\n  Nó: {info['node_name']} ({info['state']})")
-            print(f"  Termo: {info['term']}")
-            print(f"  Commit Index: {info['commit_index']}")
-            print(f"  Log ({len(info['log'])} entradas):")
-
-            if not info["log"]:
-                print("    (vazio)")
-            else:
-                for entry in info["log"]:
-                    committed = "✓" if entry["index"] <= info["commit_index"] else " "
-                    print(
-                        f"    [{committed}] index={entry['index']} "
-                        f"termo={entry['term']} cmd='{entry['command']}'"
-                    )
-            print()
-        except Pyro5.errors.CommunicationError:
-            print("  ✗ Líder inacessível")
+            print("Líder inacessível — tentando reconectar...")
             self._leader_uri = None
 
     # ── Conexão com o líder ──────────────────────────────────────────────
@@ -158,17 +107,17 @@ class RaftClient:
                 return leader_uri
             except Pyro5.errors.NamingError:
                 print(
-                    f"  ⏳ Nenhum líder registrado ainda "
+                    f"Nenhum líder registrado ainda "
                     f"(tentativa {attempt}/{max_retries})..."
                 )
             except Pyro5.errors.CommunicationError:
                 print(
-                    f"  ⏳ Nameserver inacessível "
+                    f"Nameserver inacessível "
                     f"(tentativa {attempt}/{max_retries})..."
                 )
 
             if attempt < max_retries:
                 time.sleep(self._RETRY_DELAY)
 
-        print("  ✗ Não foi possível encontrar o líder")
+        print("Não foi possível encontrar o líder")
         return None

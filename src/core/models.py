@@ -106,7 +106,6 @@ class RaftNode(BaseModel):
             )
             return (self.term, False)
 
-        # Termo maior: atualiza o nosso e limpa voted_for (step-up)
         if candidate_term > self.term:
             self.term = candidate_term
             self.voted_for = None
@@ -120,7 +119,6 @@ class RaftNode(BaseModel):
             )
             return (self.term, False)
 
-        # 4. Concede voto
         self.term = candidate_term
         self.voted_for = candidate_id
         self.reset_election_timeout()
@@ -145,7 +143,7 @@ class RaftNode(BaseModel):
         logger.info(f"[{self.node_name}] nova entrada no log | cmd='{command}'")
         return entry
 
-    # ── Lógica de AppendEntries (Heartbeat + Replicação) ──────────────────
+    # ── Lógica de AppendEntries ───────────────────────────────────────────
 
     def handle_append_entries(
         self,
@@ -162,7 +160,6 @@ class RaftNode(BaseModel):
         if entries is None:
             entries = []
 
-        # 1. Rejeita se o termo do líder é menor
         if leader_term < self.term:
             logger.warning(
                 f"[{self.node_name}] REJEITOU AppendEntries de {leader_id} | "
@@ -170,19 +167,16 @@ class RaftNode(BaseModel):
             )
             return (self.term, False)
 
-        # Heartbeat válido: atualiza estado
         self.term = leader_term
         self.state = NodeState.Follower
         self.voted_for = None
         self.votes_received = 0
         self.reset_election_timeout()
 
-        # 2. Aceita as entradas do líder (substitui o log se mudou)
         if entries and entries != self.log:
             self.log = list(entries)
             logger.info(f"[{self.node_name}] replicando entradas do líder {leader_id}")
 
-        # 3. Atualiza commit_index
         if leader_commit > self.commit_index:
             old_commit = self.commit_index
             self.commit_index = min(leader_commit, len(self.log))

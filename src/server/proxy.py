@@ -33,12 +33,6 @@ class RaftNodeProxy:
             return {"term": term, "vote_granted": granted}
 
     @Pyro5.api.expose
-    def ping(self, from_node: str) -> str:
-        """RPC de diagnóstico de conectividade."""
-        logger.info(f"[{self.node.node_name}] ping recebido de {from_node}")
-        return f"Pong from {self.node.node_name}"
-
-    @Pyro5.api.expose
     def append_entries(
         self,
         leader_id: str,
@@ -84,46 +78,3 @@ class RaftNodeProxy:
                 "term": entry["term"],
                 "error": "",
             }
-
-    @Pyro5.api.expose
-    def get_log(self) -> dict:
-        """
-        RPC de diagnóstico para visualizar o log do nó.
-        Retorna {"log": [...], "commit_index": int}.
-        """
-        with self.lock:
-            return {
-                "node_name": self.node.node_name,
-                "state": self.node.state.value,
-                "term": self.node.term,
-                "log": list(self.node.log),
-                "commit_index": self.node.commit_index,
-            }
-
-    @Pyro5.api.expose
-    def get_cluster_status(self) -> dict:
-        """
-        Verifica quais nós do cluster estão online via ping.
-        Retorna {"online": [...], "offline": [...], "total": int}.
-        """
-        online = []
-        offline = []
-
-        for peer_name, peer_uri in NODE_URIS.items():
-            if peer_name == self.node.node_name:
-                online.append(peer_name)  # eu mesmo estou online
-                continue
-            try:
-                with Pyro5.api.Proxy(peer_uri) as peer:
-                    peer._pyroTimeout = 2
-                    peer.ping(self.node.node_name)
-                online.append(peer_name)
-            except Pyro5.errors.CommunicationError:
-                offline.append(peer_name)
-
-        return {
-            "leader": self.node.node_name,
-            "online": online,
-            "offline": offline,
-            "total": len(NODE_URIS),
-        }
