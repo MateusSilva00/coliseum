@@ -53,9 +53,9 @@ class RaftNode(BaseModel):
     def reset_election_timeout(self) -> float:
         delay = uniform(*ELECTION_TIMEOUT_RANGE)
         self.election_timeout = (monotonic() * 1000) + delay
-        logger.info(
-            f"[{self.node_name}] timeout de eleição resetado para {delay / 1000}s"
-        )
+        # logger.info(
+        #     f"[{self.node_name}] timeout de eleição resetado para {delay / 1000}s"
+        # )
         return delay / 1000
 
     def reset_heartbeat_timeout(self) -> None:
