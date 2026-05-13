@@ -78,9 +78,8 @@ class RaftClient:
                             logger.error(f"Falha: {response.get('error', 'unknown')}")
                 else:
                     print(f"Erro: {error}")
-        except Pyro5.errors.CommunicationError as e:
-            logger.exception(e)
-            print("Líder inacessível — tentando reconectar...")
+        except Pyro5.errors.CommunicationError:
+            logger.warning("Líder inacessível — tentando reconectar...")
             self._leader_uri = None
 
     # ── Conexão com o líder ──────────────────────────────────────────────
