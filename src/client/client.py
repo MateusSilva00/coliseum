@@ -13,7 +13,7 @@ class RaftClient:
     e envia comandos para replicação no log.
     """
 
-    _RETRY_DELAY: float = 2.0
+    _RETRY_DELAY: float = 500
 
     def __init__(self) -> None:
         self._leader_uri: str | None = None
@@ -97,7 +97,7 @@ class RaftClient:
 
     def _lookup_leader(self) -> str | None:
         """Pesquisa o URI do líder no nameserver Pyro5."""
-        max_retries = 3
+        max_retries = 10
         for attempt in range(1, max_retries + 1):
             try:
                 ns = Pyro5.api.locate_ns(host=NAMESERVER_HOST, port=NAMESERVER_PORT)
@@ -106,12 +106,14 @@ class RaftClient:
                 logger.info(f"Líder encontrado: {leader_uri}")
                 return leader_uri
             except Pyro5.errors.NamingError:
-                print(
+                logger.debug(
                     f"Nenhum líder registrado ainda "
                     f"(tentativa {attempt}/{max_retries})..."
                 )
             except Pyro5.errors.CommunicationError:
-                print(f"Nameserver inacessível (tentativa {attempt}/{max_retries})...")
+                logger.debug(
+                    f"Nameserver inacessível (tentativa {attempt}/{max_retries})..."
+                )
 
             if attempt < max_retries:
                 time.sleep(self._RETRY_DELAY)
