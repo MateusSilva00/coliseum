@@ -8,7 +8,7 @@ from loguru import logger
 from pydantic import BaseModel, Field, computed_field
 
 ELECTION_TIMEOUT_RANGE = (5000, 30000)
-HEARTBEAT_INTERVAL = 200
+HEARTBEAT_INTERVAL = 1500
 
 
 class Daemon(BaseModel):
