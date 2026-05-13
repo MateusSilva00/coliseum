@@ -16,9 +16,6 @@ class HeartbeatManager:
     """
     Encapsula o envio periódico de heartbeats (AppendEntries) pelo líder
     para todos os followers, incluindo replicação de log.
-
-    O líder envia seu log completo a cada heartbeat. Se a maioria dos
-    followers confirmar, o commit_index avança.
     """
 
     def __init__(self, proxy: RaftNodeProxy) -> None:
@@ -37,8 +34,9 @@ class HeartbeatManager:
         """
         with self._proxy.lock:
             current_term = self._proxy.node.term
-            entries = list(self._proxy.node.log)
             commit_index = self._proxy.node.commit_index
+            new_entries = list(self._proxy.node.log[commit_index:])
+            entries = new_entries if new_entries else []
             self._proxy.node.reset_heartbeat_timeout()
 
         success_count = 1

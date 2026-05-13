@@ -173,8 +173,11 @@ class RaftNode(BaseModel):
         self.votes_received = 0
         self.reset_election_timeout()
 
-        if entries and entries != self.log:
-            self.log = list(entries)
+        if entries:
+            for entry in entries:
+                # Anexa somente entradas que ainda não existem no log
+                if entry["index"] > len(self.log):
+                    self.log.append(entry)
             logger.info(f"[{self.node_name}] replicando entradas do líder {leader_id}")
 
         if leader_commit > self.commit_index:
