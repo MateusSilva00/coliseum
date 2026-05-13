@@ -56,29 +56,30 @@ class RaftClient:
         try:
             response = leader.submit_command(command)
             if response["success"]:
-                print(
+                logger.debug(
                     f"Comando aceito pelo líder | "
                     f"index={response['index']} | termo={response['term']}"
                 )
             else:
                 error = response.get("error", "unknown")
                 if error == "not_leader":
-                    print("Nó não é mais líder — tentando reconectar...")
+                    logger.warning("Nó não é mais líder — tentando reconectar...")
                     self._leader_uri = None
                     # Retry uma vez
                     leader = self._get_leader_proxy()
                     if leader:
                         response = leader.submit_command(command)
                         if response["success"]:
-                            print(
+                            logger.info(
                                 f"Comando aceito pelo líder | "
                                 f"index={response['index']} | termo={response['term']}"
                             )
                         else:
-                            print(f"Falha: {response.get('error', 'unknown')}")
+                            logger.error(f"Falha: {response.get('error', 'unknown')}")
                 else:
                     print(f"Erro: {error}")
-        except Pyro5.errors.CommunicationError:
+        except Pyro5.errors.CommunicationError as e:
+            logger.exception(e)
             print("Líder inacessível — tentando reconectar...")
             self._leader_uri = None
 
@@ -111,10 +112,7 @@ class RaftClient:
                     f"(tentativa {attempt}/{max_retries})..."
                 )
             except Pyro5.errors.CommunicationError:
-                print(
-                    f"Nameserver inacessível "
-                    f"(tentativa {attempt}/{max_retries})..."
-                )
+                print(f"Nameserver inacessível (tentativa {attempt}/{max_retries})...")
 
             if attempt < max_retries:
                 time.sleep(self._RETRY_DELAY)
