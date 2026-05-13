@@ -26,7 +26,7 @@ Implementação do algoritmo de consenso **Raft** para replicação de log entre
 
 ---
 
-### Opção 1 — Docker Compose (recomendado)
+### Docker Compose
 
 **Linux / macOS:**
 
@@ -56,4 +56,10 @@ Para parar o cluster:
 
 ```bash
 docker compose down
+```
+
+Para iniciar o cliente:
+
+```bash
+docker attach client
 ```
