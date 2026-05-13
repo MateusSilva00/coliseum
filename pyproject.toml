@@ -9,3 +9,10 @@ dependencies = [
     "pydantic>=2.13.3",
     "pyro5>=5.16",
 ]
+
+[tool.pyright]
+pythonPlatform = "Linux"
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+extraPaths = ["."]

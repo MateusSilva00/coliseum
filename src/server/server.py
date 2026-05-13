@@ -61,6 +61,7 @@ class RaftServer:
 
     def _tick_loop(self) -> None:
         """Verifica periodicamente se o election timeout expirou."""
+        logger.info(f"[{self._node_name}] aguardando inicializacao do sistema...")
         time.sleep(self._STARTUP_DELAY)
         logger.info(f"[{self._node_name}] tick loop iniciado")
 

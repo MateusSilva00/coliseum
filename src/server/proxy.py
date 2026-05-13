@@ -23,7 +23,7 @@ class RaftNodeProxy:
         self.lock = threading.Lock()
 
     @Pyro5.api.expose
-    def request_vote(self, candidate_id: str, candidate_term: int) -> dict:
+    def request_vote(self, candidate_id: str, candidate_term: int) -> Dict:
         """
         RPC RequestVote do protocolo Raft.
         Retorna {"term": int, "vote_granted": bool}.

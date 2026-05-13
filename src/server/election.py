@@ -1,4 +1,5 @@
 import threading
+from typing import Dict
 
 import Pyro5.api
 import Pyro5.errors
@@ -56,7 +57,8 @@ class ElectionManager:
             try:
                 with Pyro5.api.Proxy(peer_uri) as peer:
                     peer._pyroTimeout = 3
-                    response = peer.request_vote(self._node_name, current_term)
+                    # pyrefly: ignore [bad-assignment]
+                    response: Dict = peer.request_vote(self._node_name, current_term)
 
                 peer_term = response["term"]
                 vote_granted = response["vote_granted"]
